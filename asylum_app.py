@@ -1,5 +1,4 @@
 import requests
-import csv
 import psycopg2
 
 # Base API endpoint URL
@@ -8,13 +7,13 @@ url = "https://api.unhcr.org/population/v1/asylum-applications/"
 # Define the parameters
 year_range = range(2013, 2023)
 coo = "UKR"
-coa_countries = ["AUT", "DEU", "ITA", "GBR", "SWE", "SWI"]
+coa_countries = ["AUT", "DEU", "ITA", "GBR", "SWE", "SWI", "FRA", "ESP", "NLD", "BEL", "GRC", "PRT", "POL"]
 
 # Database connection parameters
 db_params = {
     "dbname": "migration",
     "user": "postgres",
-    "password": "#####",
+    "password": "###",
     "host": "localhost"
 }
 
@@ -37,15 +36,17 @@ if table_exists:
 conn.commit()
 cursor.close()
 
-# Reopen the cursor and create the new table
+# Reopen the cursor and create the new table with the new columns
 cursor = conn.cursor()
 
-# Create the table with the schema
+# Create the table with the updated schema
 create_table_query = """
 CREATE TABLE IF NOT EXISTS {table_name} (
     year integer,
     coo_name text,
-    coa_name text,
+    coa_name text,    
+    app_type text,
+    dec_level text,
     applied integer
 );
 """.format(table_name=table_name)
@@ -53,9 +54,6 @@ cursor.execute(create_table_query)
 
 # Commit the table creation
 conn.commit()
-
-# Create a dictionary to store summed values
-summed_data = {}
 
 # Loop through the coa_countries
 for coa in coa_countries:
@@ -81,18 +79,19 @@ for coa in coa_countries:
                 # Parse the JSON response
                 data = response.json()
 
-                # Extract and sum data
+                # Extract and insert data into the PostgreSQL database
                 for item in data.get("items", []):
                     coo_name = item.get("coo_name", "")
                     coa_name = item.get("coa_name", "")
+                    app_type = item.get("app_type", "")
+                    dec_level = item.get("dec_level", "")
                     applied = item.get("applied", "")
 
-                    # Check if the year, coo_name, and coa_name combination exists in the dictionary
-                    key = (year, coo_name, coa_name)
-                    if key in summed_data:
-                        summed_data[key] += applied
-                    else:
-                        summed_data[key] = applied
+                    cursor.execute(
+                        "INSERT INTO asylum_applications (year, coo_name, coa_name, app_type, dec_level, applied) "
+                        "VALUES (%s, %s, %s, %s, %s, %s)",
+                        (year, coo_name, coa_name, app_type, dec_level, applied)
+                    )
 
                 # Check if there are more pages
                 if data.get("maxPages", 1) <= page:
@@ -103,13 +102,6 @@ for coa in coa_countries:
                 print(f"Failed to retrieve data for coa={coa}, year={year}, page={page}. Status code:",
                       response.status_code)
                 break
-
-# Insert the summed data into the PostgreSQL database
-for (year, coo_name, coa_name), applied in summed_data.items():
-    cursor.execute(
-        "INSERT INTO asylum_applications (year, coo_name, coa_name, applied) VALUES (%s, %s, %s, %s)",
-        (year, coo_name, coa_name, applied)
-    )
 
 # Commit the changes and close the cursor and connection
 conn.commit()

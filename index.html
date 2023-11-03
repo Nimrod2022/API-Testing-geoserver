@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+<body>
+    <div id="map" style="width: 800px; height: 600px;"></div>
+
+    <script>
+        var map = L.map('map').setView([0, 0], 2);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        fetch('https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_20M_2021_4326.geojson')
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (geojsonData) {
+                L.geoJSON(geojsonData, {
+                    style: function (feature) {
+                        return { color: 'red', fillOpacity: 0.3 };
+                    },
+                    onEachFeature: function (feature, layer) {
+                        // Customize the popup
+                        var popupContent = "NUTS ID: " + feature.properties.NUTS_ID;
+                        layer.bindPopup(popupContent);
+                    }
+                }).addTo(map);
+            })
+            .catch(function (error) {
+                console.error("Error loading GeoJSON data:", error);
+            });
+    </script>
+</body>
+</html>

@@ -45,7 +45,9 @@
 
           var countryLayer = L.geoJSON(countriesToDisplay, {
             style: function (feature) {
-              return { color: "red", fillOpacity: 0.1 };
+              return { color: "red", 
+              fillOpacity: 0.1,
+              weight: 0.5 };
             },
             onEachFeature: function (feature, layer) {
               // Customize the popup
